@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flappy Bird (HTML/CSS/JS - 1 file)</title>
+    <style>
+      :root {
+        --bg-sky: #70c5ce;
+        --bg-sky-2: #7ad7e0;
+        --ground: #deae4c;
+        --ground-2: #c7912e;
+        --pipe: #4ccf3a;
+        --pipe-2: #3aa72c;
+        --pipe-cap: #2f8f23;
+        --ink: rgba(10, 10, 10, 0.88);
+        --ui: rgba(255, 255, 255, 0.9);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: linear-gradient(180deg, var(--bg-sky) 0%, var(--bg-sky-2) 100%);
+        color: var(--ink);
+      }
+
+      .wrap {
+        width: min(560px, 92vw);
+        display: grid;
+        gap: 12px;
+        justify-items: center;
+      }
+
+      .top {
+        width: 100%;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: var(--ui);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+      }
+
+      .title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+
+      .hint {
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .stage {
+        width: 100%;
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+        background: transparent;
+      }
+
+      .hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .hud .score {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.86);
+        font-weight: 800;
+        letter-spacing: 0.4px;
+      }
+
+      .hud .high {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.86);
+        font-weight: 700;
+        opacity: 0.95;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        pointer-events: none;
+      }
+
+      .panel {
+        width: min(420px, 92%);
+        background: rgba(255, 255, 255, 0.92);
+        border-radius: 16px;
+        padding: 14px 14px 12px;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+        text-align: center;
+        pointer-events: auto;
+      }
+
+      .panel h2 {
+        margin: 4px 0 6px;
+        font-size: 18px;
+      }
+
+      .panel p {
+        margin: 0 0 10px;
+        font-size: 13px;
+        line-height: 1.35;
+        opacity: 0.9;
+      }
+
+      .row {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      button {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: #ffda35;
+        color: #201a06;
+        font-weight: 800;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .muted {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1 class="title">Flappy Bird</h1>
+        <div class="hint">Space hoặc Click để bay • R để chơi lại</div>
+      </header>
+
+      <section class="stage" aria-label="Flappy Bird game">
+        <canvas id="game" width="480" height="640" tabindex="0"></canvas>
+
+        <div class="hud" aria-hidden="true">
+          <div class="score" id="score">0</div>
+          <div class="high" id="high">Best: 0</div>
+        </div>
+
+        <div class="overlay" id="overlay">
+          <div class="panel">
+            <h2 id="overlayTitle">Nhấn Space hoặc Click để bắt đầu</h2>
+            <p id="overlayDesc">
+              Tránh ống, đừng rơi xuống đất. Mỗi lần vượt qua 1 ống được +1 điểm.
+            </p>
+            <div class="row">
+              <button id="restartBtn" type="button">Restart</button>
+            </div>
+            <div class="muted" id="overlayMeta"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      /*
+        Flappy Bird - 1 file (HTML/CSS/JS)
+
+        Mục tiêu thiết kế:
+        - Dễ chỉnh: các thông số nằm trong CONFIG
+        - Vẽ bằng canvas (không cần ảnh), chạy mượt với requestAnimationFrame
+        - Có âm thanh đơn giản bằng Web Audio (không cần file âm thanh)
+        - Tăng độ khó theo thời gian + lưu điểm cao nhất bằng localStorage
+      */
+
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+
+      const scoreEl = document.getElementById("score");
+      const highEl = document.getElementById("high");
+
+      const overlay = document.getElementById("overlay");
+      const overlayTitle = document.getElementById("overlayTitle");
+      const overlayDesc = document.getElementById("overlayDesc");
+      const overlayMeta = document.getElementById("overlayMeta");
+      const restartBtn = document.getElementById("restartBtn");
+
+      const STORAGE_KEY = "flappy_high_score_v1";
+
+      const CONFIG = {
+        gravity: 1700, // px/s^2
+        flapVelocity: -520, // px/s (âm là bay lên)
+        maxFallSpeed: 900,
+        birdRadius: 16,
+        birdX: 140,
+
+        pipeWidth: 72,
+        pipeGap: 160,
+        pipeGapMin: 120,
+        pipeGapDecayPerSec: 2.2, // giảm gap theo thời gian (tăng độ khó)
+        pipeSpawnEvery: 1.25, // giây
+        pipeSpeed: 220, // px/s
+        pipeSpeedMax: 360,
+        pipeSpeedIncreasePerSec: 3.6,
+
+        groundHeight: 96,
+
+        // Tối ưu cảm giác chơi: "cửa" spawn theo độ cao hợp lý
+        gapTopMargin: 70,
+        gapBottomMargin: 70,
+
+        // Trang trí
+        cloudSpeed: 18,
+        groundScrollSpeed: 220,
+      };
+
+      function clamp(v, min, max) {
+        return Math.max(min, Math.min(max, v));
+      }
+
+      function rand(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      // Âm thanh: dùng Web Audio để tạo beep đơn giản (tránh phụ thuộc file)
+      const audio = (() => {
+        /** @type {AudioContext | null} */
+        let ac = null;
+        let unlocked = false;
+
+        function ensure() {
+          if (!ac) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return null;
+            ac = new AudioCtx();
+          }
+          return ac;
+        }
+
+        async function unlock() {
+          const ctx = ensure();
+          if (!ctx) return;
+          if (unlocked) return;
+          try {
+            if (ctx.state === "suspended") await ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.02);
+            unlocked = true;
+          } catch {
+            unlocked = false;
+          }
+        }
+
+        function beep({ freq = 500, duration = 0.06, type = "square", volume = 0.06 }) {
+          const ctx = ensure();
+          if (!ctx) return;
+          const t0 = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, t0);
+          gain.gain.setValueAtTime(0, t0);
+          gain.gain.linearRampToValueAtTime(volume, t0 + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t0);
+          osc.stop(t0 + duration + 0.02);
+        }
+
+        return { unlock, beep };
+      })();
+
+      // Trạng thái game
+      const state = {
+        running: false,
+        gameOver: false,
+        score: 0,
+        highScore: 0,
+        timeAlive: 0,
+        lastTime: 0,
+        accumulatorSpawn: 0,
+        groundScroll: 0,
+        cloudScroll: 0,
+        difficultyPipeSpeed: CONFIG.pipeSpeed,
+        difficultyPipeGap: CONFIG.pipeGap,
+      };
+
+      // Chim
+      const bird = {
+        x: CONFIG.birdX,
+        y: canvas.height * 0.42,
+        vy: 0,
+        rot: 0,
+      };
+
+      // Ống
+      /** @type {{x:number, gapY:number, passed:boolean}[]} */
+      const pipes = [];
+
+      // Mây (trang trí nhẹ)
+      const clouds = Array.from({ length: 5 }, (_, i) => ({
+        x: (i / 5) * canvas.width + rand(0, 140),
+        y: rand(40, 220),
+        s: rand(0.85, 1.4),
+      }));
+
+      function loadHighScore() {
+        let raw = null;
+        try {
+          raw = localStorage.getItem(STORAGE_KEY);
+        } catch {
+          raw = null;
+        }
+        const n = Number(raw);
+        state.highScore = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+        highEl.textContent = `Best: ${state.highScore}`;
+      }
+
+      function saveHighScoreIfNeeded() {
+        if (state.score > state.highScore) {
+          state.highScore = state.score;
+          try {
+            localStorage.setItem(STORAGE_KEY, String(state.highScore));
+          } catch {}
+          highEl.textContent = `Best: ${state.highScore}`;
+        }
+      }
+
+      function setOverlayVisible(visible) {
+        overlay.style.display = visible ? "grid" : "none";
+      }
+
+      function resetGame() {
+        state.running = false;
+        state.gameOver = false;
+        state.score = 0;
+        state.timeAlive = 0;
+        state.accumulatorSpawn = 0;
+        state.groundScroll = 0;
+        state.cloudScroll = 0;
+        state.difficultyPipeSpeed = CONFIG.pipeSpeed;
+        state.difficultyPipeGap = CONFIG.pipeGap;
+
+        bird.x = CONFIG.birdX;
+        bird.y = canvas.height * 0.42;
+        bird.vy = 0;
+        bird.rot = 0;
+
+        pipes.length = 0;
+        scoreEl.textContent = "0";
+
+        overlayTitle.textContent = "Nhấn Space hoặc Click để bắt đầu";
+        overlayDesc.textContent =
+          "Tránh ống, đừng rơi xuống đất. Mỗi lần vượt qua 1 ống được +1 điểm.";
+        overlayMeta.textContent = "";
+        setOverlayVisible(true);
+      }
+
+      function startGame() {
+        if (state.running) return;
+        state.running = true;
+        state.gameOver = false;
+        setOverlayVisible(false);
+        flap();
+      }
+
+      function gameOver(reasonText) {
+        if (state.gameOver) return;
+        state.running = false;
+        state.gameOver = true;
+        saveHighScoreIfNeeded();
+
+        overlayTitle.textContent = "Game Over";
+        overlayDesc.textContent = reasonText || "Bạn đã thua!";
+        overlayMeta.textContent = `Điểm: ${state.score} • Best: ${state.highScore}`;
+        setOverlayVisible(true);
+
+        audio.beep({ freq: 140, duration: 0.14, type: "sawtooth", volume: 0.08 });
+        setTimeout(() => {
+          audio.beep({ freq: 90, duration: 0.16, type: "sawtooth", volume: 0.08 });
+        }, 90);
+      }
+
+      function flap() {
+        if (state.gameOver) return;
+        if (!state.running) startGame();
+
+        bird.vy = CONFIG.flapVelocity;
+        audio.beep({ freq: 520, duration: 0.055, type: "square", volume: 0.055 });
+      }
+
+      function spawnPipe() {
+        const topLimit = CONFIG.gapTopMargin;
+        const bottomLimit = canvas.height - CONFIG.groundHeight - CONFIG.gapBottomMargin;
+        const gapSize = state.difficultyPipeGap;
+        const gapY = rand(topLimit + gapSize * 0.5, bottomLimit - gapSize * 0.5);
+        pipes.push({ x: canvas.width + 40, gapY, passed: false });
+      }
+
+      function circleRectCollision(cx, cy, cr, rx, ry, rw, rh) {
+        const closestX = clamp(cx, rx, rx + rw);
+        const closestY = clamp(cy, ry, ry + rh);
+        const dx = cx - closestX;
+        const dy = cy - closestY;
+        return dx * dx + dy * dy <= cr * cr;
+      }
+
+      function updateDifficulty(dt) {
+        state.timeAlive += dt;
+        state.difficultyPipeSpeed = clamp(
+          state.difficultyPipeSpeed + CONFIG.pipeSpeedIncreasePerSec * dt,
+          CONFIG.pipeSpeed,
+          CONFIG.pipeSpeedMax,
+        );
+        state.difficultyPipeGap = clamp(
+          state.difficultyPipeGap - CONFIG.pipeGapDecayPerSec * dt,
+          CONFIG.pipeGapMin,
+          CONFIG.pipeGap,
+        );
+      }
+
+      function update(dt) {
+        if (!state.running) return;
+
+        updateDifficulty(dt);
+
+        // Chim
+        bird.vy = clamp(bird.vy + CONFIG.gravity * dt, -9999, CONFIG.maxFallSpeed);
+        bird.y += bird.vy * dt;
+
+        // Góc chim theo vận tốc (nhìn giống Flappy)
+        const targetRot = clamp(bird.vy / 700, -0.5, 1.2);
+        bird.rot += (targetRot - bird.rot) * Math.min(1, dt * 12);
+
+        // Sinh ống theo thời gian
+        state.accumulatorSpawn += dt;
+        while (state.accumulatorSpawn >= CONFIG.pipeSpawnEvery) {
+          state.accumulatorSpawn -= CONFIG.pipeSpawnEvery;
+          spawnPipe();
+        }
+
+        // Di chuyển ống + tính điểm + va chạm
+        const pipeSpeed = state.difficultyPipeSpeed;
+        const gapHalf = state.difficultyPipeGap * 0.5;
+        const pipeW = CONFIG.pipeWidth;
+        const groundY = canvas.height - CONFIG.groundHeight;
+
+        for (let i = pipes.length - 1; i >= 0; i--) {
+          const p = pipes[i];
+          p.x -= pipeSpeed * dt;
+
+          // Cộng điểm khi chim vượt qua ống
+          const pipeMidX = p.x + pipeW * 0.5;
+          if (!p.passed && pipeMidX < bird.x) {
+            p.passed = true;
+            state.score += 1;
+            scoreEl.textContent = String(state.score);
+            audio.beep({ freq: 740, duration: 0.045, type: "triangle", volume: 0.05 });
+          }
+
+          // Va chạm: 2 hình chữ nhật (ống trên và ống dưới)
+          const topRect = {
+            x: p.x,
+            y: 0,
+            w: pipeW,
+            h: p.gapY - gapHalf,
+          };
+          const bottomRect = {
+            x: p.x,
+            y: p.gapY + gapHalf,
+            w: pipeW,
+            h: groundY - (p.gapY + gapHalf),
+          };
+
+          const hitTop = circleRectCollision(
+            bird.x,
+            bird.y,
+            CONFIG.birdRadius,
+            topRect.x,
+            topRect.y,
+            topRect.w,
+            topRect.h,
+          );
+          const hitBottom = circleRectCollision(
+            bird.x,
+            bird.y,
+            CONFIG.birdRadius,
+            bottomRect.x,
+            bottomRect.y,
+            bottomRect.w,
+            bottomRect.h,
+          );
+
+          if (hitTop || hitBottom) {
+            gameOver("Bạn đã chạm vào ống!");
+            return;
+          }
+
+          // Xoá ống đã ra khỏi màn hình
+          if (p.x + pipeW < -60) pipes.splice(i, 1);
+        }
+
+        // Rơi xuống đất hoặc bay lên quá cao
+        if (bird.y + CONFIG.birdRadius >= groundY) {
+          bird.y = groundY - CONFIG.birdRadius;
+          gameOver("Bạn đã rơi xuống đất!");
+          return;
+        }
+        if (bird.y - CONFIG.birdRadius <= 0) {
+          bird.y = CONFIG.birdRadius;
+          bird.vy = 0;
+        }
+
+        // Scroll nền
+        state.groundScroll = (state.groundScroll + CONFIG.groundScrollSpeed * dt) % 48;
+        state.cloudScroll = (state.cloudScroll + CONFIG.cloudSpeed * dt) % canvas.width;
+      }
+
+      function drawCloud(x, y, s) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(s, s);
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 26, 18, 0, 0, Math.PI * 2);
+        ctx.ellipse(20, -8, 22, 16, 0, 0, Math.PI * 2);
+        ctx.ellipse(40, 0, 26, 18, 0, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawPipe(x, gapY, gapHalf) {
+        const groundY = canvas.height - CONFIG.groundHeight;
+        const w = CONFIG.pipeWidth;
+        const topH = Math.max(0, gapY - gapHalf);
+        const bottomY = gapY + gapHalf;
+        const bottomH = Math.max(0, groundY - bottomY);
+
+        // Thân ống
+        const grad = ctx.createLinearGradient(x, 0, x + w, 0);
+        grad.addColorStop(0, "#3aa72c");
+        grad.addColorStop(0.5, "#4ccf3a");
+        grad.addColorStop(1, "#2f8f23");
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, 0, w, topH);
+        ctx.fillRect(x, bottomY, w, bottomH);
+
+        // Nắp ống (cap) để giống Flappy hơn
+        const capH = 18;
+        ctx.fillStyle = "#2f8f23";
+        if (topH > 8) ctx.fillRect(x - 5, topH - capH, w + 10, capH);
+        if (bottomH > 8) ctx.fillRect(x - 5, bottomY, w + 10, capH);
+
+        // Viền nhẹ
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, 0, w, topH);
+        ctx.strokeRect(x, bottomY, w, bottomH);
+      }
+
+      function drawBird() {
+        ctx.save();
+        ctx.translate(bird.x, bird.y);
+        ctx.rotate(bird.rot);
+
+        // Thân chim
+        const bodyGrad = ctx.createRadialGradient(-6, -6, 4, 0, 0, 22);
+        bodyGrad.addColorStop(0, "#ffe658");
+        bodyGrad.addColorStop(1, "#ffc930");
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, CONFIG.birdRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Viền
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Cánh (đập nhẹ theo vy)
+        const flap = clamp(-bird.vy / 900, 0, 1);
+        ctx.fillStyle = "#ffd34a";
+        ctx.beginPath();
+        ctx.ellipse(-6, 2, 10, 7, -0.5 + flap * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Mắt
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.arc(6, -6, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.beginPath();
+        ctx.arc(8, -6, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Mỏ
+        ctx.fillStyle = "#ff7a2f";
+        ctx.beginPath();
+        ctx.moveTo(CONFIG.birdRadius - 2, -1);
+        ctx.lineTo(CONFIG.birdRadius + 12, 2);
+        ctx.lineTo(CONFIG.birdRadius - 2, 7);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      function drawGround() {
+        const y = canvas.height - CONFIG.groundHeight;
+
+        // Đất
+        const grad = ctx.createLinearGradient(0, y, 0, canvas.height);
+        grad.addColorStop(0, "#deae4c");
+        grad.addColorStop(1, "#c7912e");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, y, canvas.width, CONFIG.groundHeight);
+
+        // Cỏ
+        ctx.fillStyle = "#4ccf3a";
+        ctx.fillRect(0, y, canvas.width, 14);
+
+        // Vạch gạch đơn giản để tạo cảm giác chuyển động
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        const step = 32;
+        const offset = -state.groundScroll;
+        for (let x = offset; x < canvas.width + step; x += step) {
+          ctx.fillRect(x + 6, y + 26, 18, 6);
+          ctx.fillRect(x + 2, y + 48, 20, 6);
+        }
+      }
+
+      function drawBackground() {
+        // Trời: gradient
+        const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        sky.addColorStop(0, "#70c5ce");
+        sky.addColorStop(1, "#b6f0f4");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Mây
+        for (const c of clouds) {
+          const x = (c.x - state.cloudScroll + canvas.width) % canvas.width;
+          drawCloud(x, c.y, c.s);
+        }
+
+        // Một chút "sương"
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function draw() {
+        drawBackground();
+
+        // Ống
+        const gapHalf = state.difficultyPipeGap * 0.5;
+        for (const p of pipes) drawPipe(p.x, p.gapY, gapHalf);
+
+        // Chim
+        drawBird();
+
+        // Đất
+        drawGround();
+
+        // Dòng chữ hướng dẫn khi chưa bắt đầu
+        if (!state.running && !state.gameOver) {
+          ctx.save();
+          ctx.fillStyle = "rgba(0,0,0,0.45)";
+          ctx.font = "800 20px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+          ctx.textAlign = "center";
+          ctx.fillText("SPACE / CLICK để bay", canvas.width / 2, canvas.height * 0.32);
+          ctx.font = "600 13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+          ctx.fillText("Vượt qua ống để ghi điểm", canvas.width / 2, canvas.height * 0.32 + 22);
+          ctx.restore();
+        }
+      }
+
+      function tick(ts) {
+        if (!state.lastTime) state.lastTime = ts;
+        const dt = clamp((ts - state.lastTime) / 1000, 0, 0.033);
+        state.lastTime = ts;
+
+        update(dt);
+        draw();
+        requestAnimationFrame(tick);
+      }
+
+      function onPrimaryAction() {
+        audio.unlock();
+        flap();
+      }
+
+      // Input: Space, click, tap
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") {
+          e.preventDefault();
+          onPrimaryAction();
+        }
+        if (e.code === "KeyR") {
+          e.preventDefault();
+          resetGame();
+        }
+      });
+
+      canvas.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        canvas.focus({ preventScroll: true });
+        onPrimaryAction();
+      });
+
+      restartBtn.addEventListener("click", () => resetGame());
+
+      // Khởi tạo
+      loadHighScore();
+      resetGame();
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>
